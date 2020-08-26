@@ -22,9 +22,17 @@ def create_spark_session():
 
 
 def process_song_data(spark, input_data, output_data):
+
+    """
+    Function that read and transform song_data files to
+
+    save songs_table and artist_table on S3 (in parquet extension)
+
+    """
+
     # get filepath to song data file
     song_data = input_data + "song_data/*/*/*/*.json" #real path
-#     song_data = input_data + "song_data/A/B/C/TRABCEI128F424C983.json"
+    # song_data = input_data + "song_data/A/B/C/TRABCEI128F424C983.json"
     
     # read song data file
     df = spark.read.json(song_data)
@@ -33,6 +41,8 @@ def process_song_data(spark, input_data, output_data):
     songs_table = df.select("song_id","title","artist_id", \
                             col("year").cast("int").alias("year"),\
                             col("duration").cast("float").alias("duration"))
+
+    songs_table = songs_table.dropDuplicates()
     
     # write songs table to parquet files partitioned by year and artist
     songs_table.write.partitionBy("year", "artist_id").parquet(output_data + 'songs/', 'overwrite')
@@ -44,14 +54,24 @@ def process_song_data(spark, input_data, output_data):
                               col("artist_latitude").cast("float").alias("lattitude"), \
                               col("artist_longitude").cast("float").alias("longitude"))
 
+    artists_table = artists_table.dropDuplicates()
+
     # write artists table to parquet files
     artists_table.write.parquet(output_data + 'artists/', 'overwrite')
 
 
 def process_log_data(spark, input_data, output_data):
+
+    """
+    Function that read and transform log_data files to
+
+    save user_table, time_table and songplays_table on S3 (in parquet extension)
+
+    """
+
     # get filepath to log data file
     log_data = input_data + "log_data/*/*/*.json" #real path
-#     log_data = input_data + "log_data/2018/11/2018-11-12-events.json"
+    # log_data = input_data + "log_data/2018/11/2018-11-12-events.json"
 
     # read log data file
     df = spark.read.json(log_data)
@@ -63,6 +83,8 @@ def process_log_data(spark, input_data, output_data):
     user_table = df.select(col("userId").cast("int").alias("user_id"),\
                            col("firstName").alias("first_name"),\
                            col("lastName").alias("last_name"),"gender","level")
+    
+    user_table = user_table.dropDuplicates()
     
     # write users table to parquet files
     user_table.write.parquet(output_data + 'users/', 'overwrite')
@@ -86,7 +108,8 @@ def process_log_data(spark, input_data, output_data):
                            date_format('datetime','E').alias('weekday')
                           )
 #     print(time_table.limit(5).toPandas().head())
-    
+    time_table = time_table.dropDuplicates()
+
     # write time table to parquet files partitioned by year and month
     time_table.write.partitionBy("year", "month").parquet(output_data + 'time/', 'overwrite')
 
@@ -107,12 +130,21 @@ def process_log_data(spark, input_data, output_data):
     songplays_table = songplays_table.withColumn("year", year("start_time"))
     songplays_table = songplays_table.withColumn("month", month("start_time"))
     
-    print(songplays_table.limit(5).toPandas().head())
+#     print(songplays_table.limit(5).toPandas().head())
+
+    songplays_table = songplays_table.dropDuplicates()
 
     # write songplays table to parquet files partitioned by year and month
     songplays_table.write.partitionBy("year", "month").parquet(output_data + 'songplays/', 'overwrite')
 
 def main():
+
+    """
+    Main function, first run process_song_data() which fill the data for songs_table and artist_table
+
+    then, run process_log_data() which fill the data for user_table, time_table and songplays_table.
+    """
+
     spark = create_spark_session()
     input_data = "s3a://udacity-dend/"
     output_data = "s3a://datalake-alindo/output/"
